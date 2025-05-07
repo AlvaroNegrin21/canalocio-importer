@@ -1,0 +1,27 @@
+# Do NOT update manually; changes here will be overwritten by Copier
+_commit: v1.31
+_src_path: https://github.com/OCA/oca-addons-repo-template.git
+additional_ruff_rules: []
+ci: GitHub
+convert_readme_fragments_to_markdown: true
+enable_checklog_odoo: true
+generate_requirements_txt: true
+github_check_license: true
+github_ci_extra_env: {}
+github_enable_codecov: true
+github_enable_makepot: true
+github_enable_stale_action: true
+github_enforce_dev_status_compatibility: true
+include_wkhtmltopdf: false
+odoo_test_flavor: Both
+odoo_version: 17.0
+org_name: Binhex
+org_slug: AlvaroNegrin21
+rebel_module_groups: []
+repo_description: Model for csv read and import with queue_job for background procesing
+repo_name: Tool for csv importer
+repo_slug: canalocio-importer
+repo_website: https://github.com/AlvaroNegrin21/canalocio-importer
+use_pyproject_toml: true
+use_ruff: true
+
