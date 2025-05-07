@@ -1,0 +1,10 @@
+<odoo>
+    <record id="import_recordset_product_product_canal" model="import.recordset">
+        <field name="sequence" eval="45" />
+        <field name="name">Import Canalocio Products Recordset</field>
+        <field name="backend_id" ref="import_backend_canal" />
+        <field name="source_model">import.source.csv</field>
+        <field name="source_id" ref="import_source_csv_product_product" />
+        <field name="import_type_id" ref="import_type_product_product" />
+    </record>
+</odoo>
