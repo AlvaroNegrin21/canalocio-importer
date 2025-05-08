@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_import_source_csv_canal,Import Source CSV Canal Access,model_import_source_csv,base.group_user,1,1,1,0

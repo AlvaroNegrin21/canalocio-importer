@@ -1,0 +1,53 @@
+<odoo>
+
+    <record id="import_source_csv_view_form_inherit_canal" model="ir.ui.view">
+        <field name="name">import.source.csv.form.inherit.canal</field>
+        <field name="model">import.source.csv</field>
+        <field name="inherit_id" ref="connector_importer.view_import_source_csv_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='info']" position="after">
+                <group string="Canalocio Import Configuration">
+                    <field name="csv_path" widget="url" required="1" />
+                    <field name="available_state" />
+                    <field name="second_hand_suffix" />
+                    <field name="second_hand_default_code" />
+                </group>
+            </xpath>
+            <xpath
+                expr="//group[@name='info']/field[@name='csv_delimiter']"
+                position="attributes"
+            >
+                <attribute name="required">0</attribute>
+            </xpath>
+            <xpath
+                expr="//group[@name='info']/field[@name='csv_quotechar']"
+                position="attributes"
+            >
+                <attribute name="required">0</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="import_source_csv_view_form_link_recordset" model="ir.ui.view">
+        <field name="name">import.source.csv.form.link.recordset</field>
+        <field name="model">import.source.csv</field>
+        <field name="inherit_id" ref="connector_importer.view_import_source_csv_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='info']" position="before">
+                <field
+                    name="source_id_ids"
+                    widget="one2many_list"
+                    mode="tree"
+                    readonly="1"
+                >
+                    <tree>
+                        <field name="name" />
+                        <field name="backend_id" />
+                        <field name="import_type_id" />
+                    </tree>
+                </field>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

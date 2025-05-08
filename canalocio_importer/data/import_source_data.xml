@@ -1,0 +1,17 @@
+<odoo>
+
+    <record id="import_source_csv_product_product" model="import.source.csv">
+        <field name="name">Canalocio Products CSV</field>
+        <field name="chunk_size" eval="300" />
+        <field name="csv_delimiter">;</field>
+        <field name="csv_encoding">ISO-8859-1</field>
+
+        <field
+            name="csv_path"
+        >http://www.canalocio.es/export_info.php?key=onan&amp;val=834jds2k,23WZjd92Pas2S$2&amp;datefrom=2024-08-01&amp;outfile=1</field>
+        <field name="available_state">disponible</field>
+        <field name="second_hand_suffix">OKA</field>
+        <field name="second_hand_default_code">Segunda Mano</field>
+    </record>
+
+</odoo>

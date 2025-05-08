@@ -1,0 +1,6 @@
+<odoo>
+    <record id="import_backend_canal" model="import.backend">
+        <field name="name">Importar productos Canalocio</field>
+        <field name="version">1.0</field>
+    </record>
+</odoo>
