@@ -40,7 +40,7 @@
                     mode="tree"
                     readonly="1"
                 >
-                    <tree string="Linked Recordsets">
+                    <tree>
                         <field name="name" />
                         <field name="backend_id" />
                         <field name="import_type_id" />

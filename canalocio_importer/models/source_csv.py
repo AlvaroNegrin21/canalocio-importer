@@ -9,7 +9,12 @@ from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 from ..utils.import_utils import HTTPCSVReader, is_valid_url
-from ..utils.url_constants import *
+from ..utils.url_constants import (
+    IMAGE_TIMEOUT,
+    SECOND_HAND_DEFAULT_CODE,
+    SECOND_HAND_SUFFIX,
+    STATE_AVAILABLE,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -20,19 +25,18 @@ class CSVSource(models.Model):
     _csv_reader_klass = HTTPCSVReader
 
     second_hand_suffix = fields.Char(
-        string="Second Hand Barcode Suffix",
         default=SECOND_HAND_SUFFIX,
-        help="The suffix to append to the original product's barcode to create the second-hand variant's barcode.",
+        help="The suffix to append to the original product's barcode to create the "
+        "second-hand variant's barcode.",
     )
     second_hand_default_code = fields.Char(
-        string="Second Hand Default Code",
         default=SECOND_HAND_DEFAULT_CODE,
         help="The internal reference to set for the second-hand product variants.",
     )
     available_state = fields.Char(
-        string="CSV Available State Value",
         default=STATE_AVAILABLE,
-        help="The exact text (case-insensitive) in the 'estado' CSV column that signifies a product is available for sale.",
+        help="The exact text (case-insensitive) in the 'estado' CSV column that "
+        "signifies a product is available for sale.",
     )
 
     source_id_ids = fields.One2many(

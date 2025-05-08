@@ -17,7 +17,11 @@ Model for csv read and import with queue_job for background procesing
 
 [//]: # (addons)
 
-This part will be replaced when running the oca-gen-addons-table script from OCA/maintainer-tools.
+Available addons
+----------------
+addon | version | maintainers | summary
+--- | --- | --- | ---
+[canalocio_importer](canalocio_importer/) | 17.0.1.0.0 |  | Import products from Canalocio CSV feed with integrated logic
 
 [//]: # (end addons)
 

@@ -5,8 +5,6 @@ from odoo.addons.component.core import Component
 try:
     from odoo.addons.connector_importer.log import logger
 except ImportError:
-    import logging
-
     logger = logging.getLogger(__name__)
     logger.warning("Could not import original logger. Using standard __name__ logger.")
 
@@ -61,7 +59,8 @@ class CanalocioRecordImporterOverride(Component):
                 self.tracker.log_error({}, line, odoo_record, message=err)
                 if self.must_break_on_error:
                     logger.error(
-                        "Import failed during mapping/savepoint for record %s (%s): %s",
+                        "Import failed during mapping/savepoint for record "
+                        "%s (%s): %s",
                         line.get("_line_nr", "N/A"),
                         line.get(self.unique_key, "N/A"),
                         err,
@@ -69,7 +68,8 @@ class CanalocioRecordImporterOverride(Component):
                     )
                     raise
                 logger.warning(
-                    "Import skipped during mapping/savepoint for record %s (%s) due to error: %s",
+                    "Import skipped during mapping/savepoint for record "
+                    "%s (%s) due to error: %s",
                     line.get("_line_nr", "N/A"),
                     line.get(self.unique_key, "N/A"),
                     err,
@@ -78,7 +78,8 @@ class CanalocioRecordImporterOverride(Component):
 
             if values is None:
                 logger.debug(
-                    "Mapper returned None for line %s (%s). Skipping record processing.",
+                    "Mapper returned None for line %s (%s). "
+                    "Skipping record processing.",
                     line.get("_line_nr", "N/A"),
                     line.get(self.unique_key, "N/A"),
                 )
@@ -92,7 +93,8 @@ class CanalocioRecordImporterOverride(Component):
             try:
                 with self.env.cr.savepoint():
                     logger.debug(
-                        "Attempting ORM operation for record %s (%s) with values: %s",
+                        "Attempting ORM operation for record %s (%s) with "
+                        "values: %s",
                         line.get("_line_nr", "N/A"),
                         line.get(self.unique_key, "N/A"),
                         values,
@@ -106,7 +108,10 @@ class CanalocioRecordImporterOverride(Component):
                             self.tracker.log_skipped(
                                 values,
                                 line,
-                                {"message": "Write-only importer, record not found."},
+                                {
+                                    "message": "Write-only importer, "
+                                    "record not found."
+                                },
                             )
                             continue
 
@@ -117,7 +122,7 @@ class CanalocioRecordImporterOverride(Component):
                 self.tracker.log_error(values, line, odoo_record, message=err)
                 if self.must_break_on_error:
                     logger.error(
-                        "Import failed during ORM operation for record %s (%s): %s",
+                        "Import failed during ORM operation for record " "%s (%s): %s",
                         line.get("_line_nr", "N/A"),
                         line.get(self.unique_key, "N/A"),
                         err,
@@ -128,7 +133,8 @@ class CanalocioRecordImporterOverride(Component):
                     raise
 
                 logger.warning(
-                    "Import skipped during ORM operation for record %s (%s) due to error: %s",
+                    "Import skipped during ORM operation for record "
+                    "%s (%s) due to error: %s",
                     line.get("_line_nr", "N/A"),
                     line.get(self.unique_key, "N/A"),
                     err,

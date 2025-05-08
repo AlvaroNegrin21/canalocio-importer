@@ -1,5 +1,6 @@
 import logging
 
+from odoo import _
 from odoo.exceptions import UserError
 
 from odoo.addons.component.core import Component
@@ -22,23 +23,16 @@ class ProductProductCanalMapper(Component):
     _apply_on = "product.template"
     _mapper_usage = "importer.mapper"
 
-    @mapping
-    def map_record(self, record):
-        """
-        Main mapping method to transform source record (CSV row dict)
-        into Odoo product.template values.
-        Handles None values returned by the CSV reader for empty fields.
-        """
+    def _preprocess_record(self, record):
+        """Replace None values with empty strings in the record."""
         processed_record = {}
         for k, v in record.items():
             if k and isinstance(k, str):
-                if v is None:
-                    processed_record[k] = ""
-                else:
-                    processed_record[k] = v
+                processed_record[k] = "" if v is None else v
+        return processed_record
 
-        record = processed_record
-
+    def _get_source_config(self):
+        """Find and validate the associated import.source.csv configuration."""
         backend_record = self.collection
         recordset_record = self.env["import.recordset"].search(
             [
@@ -50,13 +44,17 @@ class ProductProductCanalMapper(Component):
 
         if not recordset_record:
             _logger.error(
-                "Mapper %s: Could not find linked import.recordset for backend %s (ID: %s) and import type 'product_product_canal'.",
+                "Mapper %s: Could not find linked import.recordset for backend "
+                "%s (ID: %s) and import type 'product_product_canal'.",
                 self._name,
                 backend_record.display_name,
                 backend_record.id,
             )
             raise UserError(
-                "Import recordset configuration not found based on backend and type key."
+                _(
+                    "Import recordset configuration not found based on backend "
+                    "and type key."
+                )
             )
 
         source_config_id = recordset_record.source_id
@@ -68,36 +66,32 @@ class ProductProductCanalMapper(Component):
             or not source_config._name == "import.source.csv"
         ):
             _logger.error(
-                "Mapper %s: Retrieved source_config is not import.source.csv or is missing after browsing.",
+                "Mapper %s: Retrieved source_config is not import.source.csv or "
+                "is missing after browsing.",
                 self._name,
             )
             raise UserError(
-                "Import source configuration found is not of the expected type."
+                _("Import source configuration found is not of the expected type.")
             )
 
-        parse_float_method = getattr(source_config, "_parse_float", None)
-        fetch_image_b64_method = getattr(source_config, "_fetch_image_b64", None)
+        return source_config, recordset_record
 
-        if not parse_float_method or not fetch_image_b64_method:
-            _logger.warning(
-                "Mapper %s: Required methods (_parse_float or _fetch_image_b64) not found on source_config %s.",
-                self._name,
-                source_config.display_name,
-            )
-
+    def _validate_barcode(self, record, source_config_id):
+        """Validate the EAN13 barcode and return it, or None if invalid."""
         barcode = _safe_get_string(record, "ean13")
 
         if not barcode:
             _logger.warning(
                 "Config ID %s: Row skipped - EAN13 is empty. Raw data: %s",
-                source_config.id,
+                source_config_id,
                 record,
             )
             return None
         if not barcode.isdigit():
             _logger.warning(
-                "Config ID %s: Row skipped - EAN13 contains non-digits. Value: '%s'. Raw data: %s",
-                source_config.id,
+                "Config ID %s: Row skipped - EAN13 contains non-digits. "
+                "Value: '%s'. Raw data: %s",
+                source_config_id,
                 barcode,
                 record,
             )
@@ -105,14 +99,21 @@ class ProductProductCanalMapper(Component):
 
         if len(barcode) not in [8, 12, 13]:
             _logger.warning(
-                "Config ID %s: Warning - EAN13 has unusual length (%s). Value: '%s'. Raw data: %s",
-                source_config.id,
+                "Config ID %s: Warning - EAN13 has unusual length (%s). "
+                "Value: '%s'. Raw data: %s",
+                source_config_id,
                 len(barcode),
                 barcode,
                 record,
             )
 
-        title = _safe_get_string(record, "titulo", f"Producto {barcode}")
+        return barcode
+
+    def _map_basic_fields(self, record, parse_float_method, source_config):
+        """Map basic fields like title, prices, weight, and availability."""
+        title = _safe_get_string(
+            record, "titulo", f"Producto {_safe_get_string(record, 'ean13')}"
+        )
 
         pvp = (
             parse_float_method(_safe_get_string(record, "pvp"))
@@ -135,81 +136,86 @@ class ProductProductCanalMapper(Component):
             == source_config.available_state.lower()
         )
 
+        return {
+            "name": title,
+            "list_price": pvp,
+            "standard_price": pvd,
+            "weight": weight,
+            "sale_ok": is_available,
+        }
+
+    def _fetch_image(self, record, source_config_id, barcode, fetch_image_b64_method):
+        """Fetch the product image from a URL if available."""
         image_url = _safe_get_string(record, "caratula")
         image_b64 = False
-        if image_url and fetch_image_b64_method:
-            _logger.info(
-                "Mapper %s (Config ID %s): Image URL found. Attempting to fetch image from URL: %s",
-                self._name,
-                source_config.id,
-                image_url,
-            )
-            try:
-                image_b64 = fetch_image_b64_method(image_url)
-                _logger.info(
-                    "Mapper %s (Config ID %s): Image fetch result: %s",
-                    self._name,
-                    source_config.id,
-                    "Success (Base64 data obtained)"
-                    if image_b64
-                    else "Failed or No data",
-                )
-            except Exception as e:
-                _logger.error(
-                    "Mapper %s (Config ID %s): Failed to fetch image from URL %s for barcode %s: %s",
-                    self._name,
-                    source_config.id,
-                    image_url,
-                    barcode,
-                    e,
-                    exc_info=True,
-                )
-                image_b64 = False
 
-        elif not image_url:
+        if not image_url:
             _logger.info(
                 "Mapper %s (Config ID %s): No image URL provided for barcode %s.",
                 self._name,
-                source_config.id,
+                source_config_id,
                 barcode,
             )
-        elif not fetch_image_b64_method:
-            _logger.warning(
-                "Mapper %s (Config ID %s): Image URL provided but _fetch_image_b64 method is missing on source_config.",
-                self._name,
-                source_config.id,
-            )
+            return False
 
-        html_content = ""
-        disponibilidad = _safe_get_string(record, "disponibilidad")
-        if disponibilidad:
-            html_content += (
-                f"<p><label>Fecha distribución:</label> {disponibilidad}</p>"
+        if not fetch_image_b64_method:
+            _logger.warning(
+                "Mapper %s (Config ID %s): Image URL provided but "
+                "_fetch_image_b64 method is missing on source_config.",
+                self._name,
+                source_config_id,
             )
-        distribuidor = _safe_get_string(record, "distribuidor")
-        if distribuidor:
-            html_content += f"<p><label>Distribuidor:</label> {distribuidor}</p>"
-        sinopsis = _safe_get_string(record, "sinopsis")
-        if sinopsis:
-            html_content += f"<p><label>Info:</label> {sinopsis}</p>"
-        director = _safe_get_string(record, "pelicula director")
-        if director:
-            html_content += f"<p><label>Directores:</label> {director}</p>"
-        actores = _safe_get_string(record, "pelicula actores")
-        if actores:
-            html_content += f"<p><label>Actores:</label> {actores}</p>"
-        duracion = _safe_get_string(record, "pelicula duracion")
-        if duracion:
-            html_content += f"<p><label>Duración:</label> {duracion}</p>"
-        audio = _safe_get_string(record, "pelicula audio")
-        if audio:
-            html_content += f"<p><label>Audio:</label> {audio}</p>"
-        subtitulos = _safe_get_string(record, "pelicula subtitulos")
-        if subtitulos:
-            html_content += f"<p><label>Subtítulos:</label> {subtitulos}</p>"
-        clasificacion = _safe_get_string(record, "pelicula clasificacion")
-        if clasificacion:
-            html_content += f"<p><label>Clasificación:</label> {clasificacion}</p>"
+            return False
+
+        _logger.info(
+            "Mapper %s (Config ID %s): Image URL found. Attempting to fetch "
+            "image from URL: %s",
+            self._name,
+            source_config_id,
+            image_url,
+        )
+        try:
+            image_b64 = fetch_image_b64_method(image_url)
+            _logger.info(
+                "Mapper %s (Config ID %s): Image fetch result: %s",
+                self._name,
+                source_config_id,
+                "Success (Base64 data obtained)" if image_b64 else "Failed or No data",
+            )
+        except Exception as e:
+            _logger.error(
+                "Mapper %s (Config ID %s): Failed to fetch image from URL %s "
+                "for barcode %s: %s",
+                self._name,
+                source_config_id,
+                image_url,
+                barcode,
+                e,
+                exc_info=True,
+            )
+            image_b64 = False
+        return image_b64
+
+    def _build_html_description(self, record):
+        """Build the HTML description from various record fields."""
+        html_content = ""
+
+        fields_to_include = {
+            "disponibilidad": "Fecha distribución",
+            "distribuidor": "Distribuidor",
+            "sinopsis": "Info",
+            "pelicula director": "Directores",
+            "pelicula actores": "Actores",
+            "pelicula duracion": "Duración",
+            "pelicula audio": "Audio",
+            "pelicula subtitulos": "Subtítulos",
+            "pelicula clasificacion": "Clasificación",
+        }
+
+        for key, label in fields_to_include.items():
+            value = _safe_get_string(record, key)
+            if value:
+                html_content += f"<p><label>{label}:</label> {value}</p>"
 
         genre_names = []
         for i in range(1, 6):
@@ -219,9 +225,10 @@ class ProductProductCanalMapper(Component):
         if genre_names:
             html_content += f"<p><label>Género:</label> {', '.join(genre_names)}</p>"
 
-        description_sale = _safe_get_string(record, "sinopsis")
-        description = html_content
+        return html_content
 
+    def _process_tags(self, record, recordset_record_id, source_config_id):
+        """Process tags from record, using/creating records with caching."""
         tag_names = []
         for i in range(1, 7):
             tag_column = f"tag_{i}"
@@ -229,23 +236,26 @@ class ProductProductCanalMapper(Component):
             if tag_name:
                 tag_names.append(tag_name)
 
-        cache_key = f"tags_recordset_{recordset_record.id}"
+        if not tag_names:
+            return [(6, 0, [])]
+
+        cache_key = f"tags_recordset_{recordset_record_id}"
         if not hasattr(self, "_tag_cache"):
             self._tag_cache = {}
         if cache_key not in self._tag_cache:
             self._tag_cache[cache_key] = {}
 
         current_tag_cache = self._tag_cache[cache_key]
-
         tag_ids = []
         ProductTag = self.env["product.tag"]
 
         _logger.info(
             "Mapper %s (Config ID %s): Processing tags: %s",
             self._name,
-            source_config.id,
+            source_config_id,
             tag_names,
         )
+
         for tag_name in tag_names:
             if not tag_name:
                 continue
@@ -255,9 +265,10 @@ class ProductProductCanalMapper(Component):
                 tag_id = current_tag_cache[tag_name_lower]
                 if tag_id:
                     _logger.debug(
-                        "Mapper %s (Config ID %s): Tag '%s' found in cache (ID: %s).",
+                        "Mapper %s (Config ID %s): Tag '%s' found in cache "
+                        "(ID: %s).",
                         self._name,
-                        source_config.id,
+                        source_config_id,
                         tag_name,
                         tag_id,
                     )
@@ -266,9 +277,9 @@ class ProductProductCanalMapper(Component):
                 tag = ProductTag.search([("name", "=ilike", tag_name)], limit=1)
                 if tag:
                     _logger.debug(
-                        "Mapper %s (Config ID %s): Tag '%s' found in DB (ID: %s).",
+                        "Mapper %s (Config ID %s): Tag '%s' found in DB " "(ID: %s).",
                         self._name,
-                        source_config.id,
+                        source_config_id,
                         tag_name,
                         tag.id,
                     )
@@ -279,32 +290,73 @@ class ProductProductCanalMapper(Component):
                         _logger.info(
                             "Mapper %s (Config ID %s): Creating new tag '%s'.",
                             self._name,
-                            source_config.id,
+                            source_config_id,
                             tag_name,
                         )
                         new_tag = ProductTag.create({"name": tag_name})
                         _logger.info(
-                            f"Config ID {source_config.id}: Created new tag '{tag_name}' (ID: {new_tag.id})"
+                            f"Config ID {source_config_id}"
+                            f": Created new tag '{tag_name}' "
+                            f"(ID: {new_tag.id})"
                         )
                         current_tag_cache[tag_name_lower] = new_tag.id
                         tag_ids.append(new_tag.id)
                     except Exception as e:
                         _logger.error(
-                            f"Config ID {source_config.id}: Failed to create tag '{tag_name}' for barcode {barcode}: {e}",
+                            f"Config ID {source_config_id}"
+                            f": Failed to create tag '{tag_name}': {e}",
                             exc_info=True,
                         )
                         current_tag_cache[tag_name_lower] = None
 
         unique_tag_ids = list(set(tag_ids))
-        tag_m2m_command = [(6, 0, unique_tag_ids)]
+        return [(6, 0, unique_tag_ids)]
+
+    @mapping
+    def map_record(self, record):
+        """
+        Main mapping method to transform source record (CSV row dict)
+        into Odoo product.template values.
+        Handles None values returned by the CSV reader for empty fields.
+        """
+        processed_record = self._preprocess_record(record)
+
+        source_config, recordset_record = self._get_source_config()
+
+        parse_float_method = getattr(source_config, "_parse_float", None)
+        fetch_image_b64_method = getattr(source_config, "_fetch_image_b64", None)
+
+        barcode = self._validate_barcode(processed_record, source_config.id)
+        if not barcode:
+            return None
+
+        basic_values = self._map_basic_fields(
+            processed_record, parse_float_method, source_config
+        )
+
+        image_b64 = self._fetch_image(
+            processed_record,
+            source_config.id,
+            barcode,
+            fetch_image_b64_method,
+        )
+
+        description = self._build_html_description(processed_record)
+        description_sale = _safe_get_string(processed_record, "sinopsis")
+
+        tag_m2m_command = self._process_tags(
+            processed_record,
+            recordset_record.id,
+            source_config.id,
+        )
 
         odoo_values = {
-            "name": title,
+            "name": basic_values["name"],
             "barcode": barcode,
-            "list_price": pvp,
-            "standard_price": pvd,
-            "weight": weight,
-            "sale_ok": is_available,
+            "list_price": basic_values["list_price"],
+            "standard_price": basic_values["standard_price"],
+            "weight": basic_values["weight"],
+            "sale_ok": basic_values["sale_ok"],
             "detailed_type": "product",
             "categ_id": self.env.ref("product.product_category_all").id,
             "description_sale": description_sale,
@@ -317,7 +369,8 @@ class ProductProductCanalMapper(Component):
 
         if "taxes_id" in odoo_values:
             _logger.warning(
-                "Mapper %s (Config ID %s): 'taxes_id' key found in mapped values before return. Removing it.",
+                "Mapper %s (Config ID %s): 'taxes_id' key found in mapped values "
+                "before return. Removing it.",
                 self._name,
                 source_config.id,
             )

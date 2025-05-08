@@ -11,7 +11,7 @@ from odoo.addons.connector_importer.utils.import_utils import (
     guess_csv_metadata,
 )
 
-from ..utils.url_constants import *
+from ..utils.url_constants import REQUESTS_TIMEOUT
 
 _logger = logging.getLogger(__name__)
 
@@ -57,8 +57,9 @@ class HTTPCSVReader(CSVReader):
                             filepath,
                         )
                         raise UserError(
-                            _("The HTTP response from %s is empty.") % filepath
-                        )
+                            _("The HTTP response from %(filepath)s is empty.")
+                            % {"filepath": filepath}
+                        ) from None
 
                     _logger.info(
                         "HTTPCSVReader: Downloaded %s bytes.", len(downloaded_content)
@@ -83,31 +84,38 @@ class HTTPCSVReader(CSVReader):
                         _logger.error(
                             "HTTPCSVReader: Error guessing metadata: %s", meta_err
                         )
-                        raise meta_err
+                        raise meta_err from None
 
                     final_kwargs["filedata"] = downloaded_content
                     filepath = None
 
-            except requests.Timeout:
+            except requests.Timeout as e:
                 _logger.error(
                     "HTTPCSVReader: Timeout while fetching CSV from %s", filepath
                 )
                 raise UserError(
-                    _("Timeout while fetching CSV from %s. Please try again later.")
-                    % filepath
-                )
+                    _(
+                        "Timeout while fetching CSV from %(filepath)s"
+                        ". Please try again later."
+                    )
+                    % {"filepath": filepath}
+                ) from e
             except requests.RequestException as e:
                 _logger.error(
                     "HTTPCSVReader: Error fetching CSV from %s: %s", filepath, e
                 )
-                raise UserError(_("Error fetching CSV from %s: %s") % (filepath, e))
+                raise UserError(
+                    _("Error fetching CSV from %(filepath)s: %(error)s")
+                    % {"filepath": filepath, "error": e}
+                ) from e
             except Exception as e:
                 _logger.exception(
                     "HTTPCSVReader: Unexpected error during HTTP fetch for %s", filepath
                 )
                 raise UserError(
-                    _("Unexpected error processing CSV from %s: %s") % (filepath, e)
-                )
+                    _("Unexpected error processing CSV from %(filepath)s: %(error)s")
+                    % {"filepath": filepath, "error": e}
+                ) from e
             finally:
                 if response:
                     response.close()

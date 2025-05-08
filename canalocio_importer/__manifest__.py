@@ -1,9 +1,11 @@
 {
-    "name": "Canalocio Importer (Integrated Logic)",
+    "name": "Canalocio Importer",
     "version": "17.0.1.0.0",
     "summary": "Import products from Canalocio CSV feed with integrated logic",
-    "category": "Connetor",
+    "category": "Connector",
     "author": "Binhex",
+    "website": "https://github.com/AlvaroNegrin21/canalocio-importer",
+    "license": "LGPL-3",
     "depends": [
         "base",
         "product",

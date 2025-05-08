@@ -1,7 +1,5 @@
-<odoo>
-    <data noupdate="1">
+<odoo noupdate="1">
         <record id="product_tag_second_hand" model="product.tag">
             <field name="name">Second hand</field>
         </record>
-    </data>
 </odoo>
